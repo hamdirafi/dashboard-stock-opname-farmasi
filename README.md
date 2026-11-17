@@ -9,8 +9,8 @@ mendekati atau sudah melewati tanggal expired.
 ![Preview dashboard](docs/preview.png)
 
 ## Demo
-- **Versi web statis (GitHub Pages):** https://USERNAME.github.io/NAMA-REPO/
-- **Versi Google Apps Script (terhubung ke Google Sheets):** APPS_SCRIPT_URL
+- **Versi web statis (GitHub Pages):** https://hamdirafi.github.io/dashboard-stock-opname-farmasi/
+- **Versi Google Apps Script (terhubung ke Google Sheets):** [APPS_SCRIPT_URL](https://script.google.com/macros/s/AKfycbw0meTlh7-zh_Gg546nZkp28my0Pvr6Drf7-FdPbCx3-C0EpGtKzguutTZGhUfPfxQ/exec)
 
 ## Fitur
 - Filter: tanggal opname, tanggal masuk, tanggal expired, jenis barang, status expired, gudang, status mutu, selisih stok, dan pencarian nama/kode/batch
