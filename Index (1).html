@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dasbor Stock Opname – Gudang Farmasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* =========================================================
+   1. TOKEN WARNA & TIPOGRAFI  (ubah di sini untuk ganti tema)
+   ========================================================= */
+:root{
+  --bg:#EDF1F3; --panel:#FFFFFF; --ink:#13242D; --muted:#5B6E78; --line:#D5DDE2;
+  --brand:#0B6A6F; --brand-dark:#0F2A31; --brand-soft:#E1F0F0;
+  --expired:#B42318; --expired-bg:#FDECEA;
+  --kritis:#C4581A;  --kritis-bg:#FDEFE3;
+  --waspada:#8A6D08; --waspada-bg:#FBF3D6;
+  --aman:#2F7D5A;    --aman-bg:#E3F3EA;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:12px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid #F2B84B;outline-offset:2px}
+
+/* =========================================================
+   2. LAYOUT: sidebar filter + konten
+   ========================================================= */
+.app{display:grid;grid-template-columns:292px minmax(0,1fr);min-height:100vh}
+.side{background:var(--brand-dark);color:#E7F0F1;padding:20px 18px 28px;position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto}
+.side h2{font-size:15px;font-weight:600;margin:0 0 2px}
+.side .sub{color:#93AEB3;font-size:12px;margin:0 0 18px}
+.fgroup{margin:0 0 18px;border:0;padding:0}
+.fgroup>legend,.fgroup>label.t{display:block;font-size:12.5px;font-weight:500;color:#C6D9DC;margin:0 0 6px;padding:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.side input[type=date],.side input[type=search],.side select{
+  width:100%;background:#17363E;border:1px solid #2B525B;border-radius:6px;padding:7px 9px;color:#F3F8F8;color-scheme:dark;min-width:0}
+.side input::placeholder{color:#7F9AA0}
+.side small{display:block;color:#8FA9AE;font-size:11.5px;margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:transparent;border:1px solid #3A626B;color:#D5E5E7;border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer}
+.chip:hover{border-color:#7FB3B8}
+.chip[aria-pressed=true]{background:#CFE9EA;color:#0F2A31;border-color:#CFE9EA;font-weight:500}
+.btn-reset{width:100%;background:transparent;border:1px solid #5C8B92;color:#E7F0F1;border-radius:6px;padding:8px;cursor:pointer;margin-top:4px}
+.btn-reset:hover{background:#17363E}
+.count{font-size:12.5px;color:#B7CDD0;margin:0 0 16px;padding:10px 12px;background:#17363E;border-radius:6px}
+.count b{color:#fff;font-weight:600}
+
+.main{padding:22px 26px 40px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.top h1{font-size:23px;line-height:1.2;margin:0 0 4px;font-weight:600;letter-spacing:-.01em}
+.top p{margin:0;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 13px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:#085458;color:#fff}
+.filter-toggle{display:none}
+.notice{background:var(--expired-bg);border:1px solid #F1B8B2;color:var(--expired);padding:9px 12px;border-radius:6px;margin-bottom:14px;display:none}
+
+/* =========================================================
+   3. KPI + JALUR STATUS EXPIRED
+   ========================================================= */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.kpi{padding:16px 18px;border-left:1px solid var(--line)}
+.kpi:first-child{border-left:0}
+.kpi .l{color:var(--muted);font-size:12.5px}
+.kpi .v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:3px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12.5px;color:var(--muted)}
+.neg{color:var(--expired)} .pos{color:var(--aman)}
+.fefo{padding:16px 18px 14px;border-top:1px solid var(--line)}
+.fefo-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:9px}
+.fefo-head h3{margin:0;font-size:14px;font-weight:600}
+.fefo-head span{color:var(--muted);font-size:12.5px}
+.bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:#E8EDF0;gap:2px}
+.bar i{display:block;min-width:3px;height:100%}
+.fefo-legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.fl{display:block;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:6px 8px;cursor:pointer}
+.fl:hover{background:#F3F6F7}
+.fl[aria-pressed=true]{border-color:var(--ink);background:#F3F6F7}
+.fl .n{display:flex;align-items:center;gap:7px;font-weight:500}
+.fl .n u{width:10px;height:10px;border-radius:2px;display:inline-block}
+.fl .d{color:var(--muted);font-size:12.5px;margin-left:17px;font-variant-numeric:tabular-nums}
+
+/* =========================================================
+   4. GRAFIK
+   ========================================================= */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.card{padding:16px 18px 14px;min-width:0}
+.card h3{margin:0 0 2px;font-size:14px;font-weight:600}
+.card .hint{margin:0 0 10px;color:var(--muted);font-size:12.5px}
+.cv{position:relative;height:260px}
+.cv.tall{height:330px}
+.empty{color:var(--muted);padding:26px 4px;text-align:center}
+
+/* daftar prioritas */
+.watch{list-style:none;margin:0;padding:0}
+.watch li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:9px 0;border-top:1px solid var(--line)}
+.watch li:first-child{border-top:0}
+.watch .nm{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.watch .mt{color:var(--muted);font-size:12.5px}
+.watch .mt code{font-family:var(--mono);font-size:12px}
+.watch .rt{text-align:right;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* =========================================================
+   5. TABEL
+   ========================================================= */
+.tbl-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 18px 10px}
+.tbl-head h3{margin:0;font-size:14px;font-weight:600}
+.tbl-head .tools{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px}
+.tbl-head select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff}
+.scroll{overflow-x:auto;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;min-width:1180px}
+th,td{padding:8px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid #E6ECEF}
+th{background:#F4F7F8;font-weight:500;color:var(--muted);font-size:12.5px;position:sticky;top:0;cursor:pointer;user-select:none}
+th:hover{color:var(--ink)}
+th[aria-sort=ascending]::after{content:" ▲";font-size:9px}
+th[aria-sort=descending]::after{content:" ▼";font-size:9px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.nm{max-width:290px;overflow:hidden;text-overflow:ellipsis}
+td code{font-family:var(--mono);font-size:12px}
+tbody tr:hover{background:#F8FBFB}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500}
+.b-Expired{background:var(--expired-bg);color:var(--expired)}
+.b-Kritis{background:var(--kritis-bg);color:var(--kritis)}
+.b-Waspada{background:var(--waspada-bg);color:var(--waspada)}
+.b-Aman{background:var(--aman-bg);color:var(--aman)}
+.b-Released{background:var(--aman-bg);color:var(--aman)}
+.b-Karantina{background:var(--waspada-bg);color:var(--waspada)}
+.b-Ditolak{background:var(--expired-bg);color:var(--expired)}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 18px;color:var(--muted);font-size:12.5px}
+.pager .btns{display:flex;gap:6px}
+.pager button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 11px;cursor:pointer}
+.pager button:disabled{opacity:.45;cursor:default}
+.foot{color:var(--muted);font-size:12px;margin-top:18px}
+
+/* =========================================================
+   6. RESPONSIF
+   ========================================================= */
+@media (max-width:1180px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi:nth-child(4){border-left:0}.kpi:nth-child(n+4){border-top:1px solid var(--line)}}
+@media (max-width:980px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;display:none}
+  .side.open{display:block}
+  .filter-toggle{display:inline-block}
+  .grid{grid-template-columns:1fr}
+  .main{padding:16px 14px 30px}
+}
+@media (max-width:600px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi{border-left:0!important;border-top:1px solid var(--line)}
+  .kpi:nth-child(-n+2){border-top:0}
+  .kpi:nth-child(even){border-left:1px solid var(--line)!important}
+  .fefo-legend{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= SIDEBAR FILTER ================= -->
+  <aside class="side" id="side" aria-label="Filter data">
+    <h2>Filter data</h2>
+    <p class="sub">Semua grafik dan tabel ikut berubah.</p>
+    <p class="count" id="count" aria-live="polite"></p>
+
+    <fieldset class="fgroup">
+      <legend>Cari barang</legend>
+      <input type="search" id="f-search" placeholder="Nama, kode, atau no. batch" autocomplete="off">
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <legend>Tanggal opname</legend>
+      <div class="row2">
+        <input type="date" id="f-opFrom" aria-label="Tanggal opname dari">
+        <input type="date" id="f-opTo" aria-label="Tanggal opname sampai">
+      </div>
+      <div class="chips" id="monthChips" style="margin-top:8px"></div>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <legend>Jenis barang</legend>
+      <div class="chips" id="chips-jenis"></div>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <legend>Status expired</legend>
+      <div class="chips" id="chips-status"></div>
+      <small>Dihitung dari tanggal expired dikurangi tanggal opname.</small>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <legend>Tanggal expired</legend>
+      <div class="row2">
+        <input type="date" id="f-exFrom" aria-label="Tanggal expired dari">
+        <input type="date" id="f-exTo" aria-label="Tanggal expired sampai">
+      </div>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <legend>Tanggal masuk barang</legend>
+      <div class="row2">
+        <input type="date" id="f-inFrom" aria-label="Tanggal masuk dari">
+        <input type="date" id="f-inTo" aria-label="Tanggal masuk sampai">
+      </div>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <label class="t" for="f-gudang">Gudang</label>
+      <select id="f-gudang"></select>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <label class="t" for="f-mutu">Status mutu</label>
+      <select id="f-mutu"></select>
+    </fieldset>
+
+    <fieldset class="fgroup">
+      <label class="t" for="f-selisih">Selisih stok</label>
+      <select id="f-selisih">
+        <option value="">Semua</option>
+        <option value="ada">Hanya yang ada selisih</option>
+        <option value="kurang">Barang kurang (fisik &lt; sistem)</option>
+        <option value="lebih">Barang lebih (fisik &gt; sistem)</option>
+        <option value="sesuai">Sesuai (tanpa selisih)</option>
+      </select>
+    </fieldset>
+
+    <button class="btn-reset" id="btn-reset" type="button">Reset semua filter</button>
+  </aside>
+
+  <!-- ================= KONTEN ================= -->
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1>Stock opname gudang farmasi</h1>
+        <p id="subtitle"></p>
+      </div>
+      <div class="actions">
+        <button class="btn filter-toggle" id="btn-filter" type="button">Filter</button>
+        <button class="btn" id="btn-refresh" type="button">Segarkan data</button>
+        <button class="btn" id="btn-load" type="button">Muat file Excel</button>
+        <button class="btn primary" id="btn-csv" type="button">Ekspor CSV</button>
+        <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+      </div>
+    </div>
+    <div class="notice" id="notice" role="alert"></div>
+
+    <section class="panel" aria-label="Ringkasan">
+      <div class="kpis" id="kpis"></div>
+      <div class="fefo">
+        <div class="fefo-head">
+          <h3>Sebaran nilai stok menurut umur expired</h3>
+          <span>Klik satu kelompok untuk memfilter</span>
+        </div>
+        <div class="bar" id="fefo-bar" role="img" aria-label="Proporsi nilai stok per status expired"></div>
+        <div class="fefo-legend" id="fefo-legend"></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel card">
+        <h3>Nilai stok fisik per jenis barang</h3>
+        <p class="hint">Dalam juta rupiah</p>
+        <div class="cv"><canvas id="c-jenis"></canvas></div>
+      </section>
+      <section class="panel card">
+        <h3>Nilai stok fisik per gudang</h3>
+        <p class="hint">Porsi dari total nilai stok yang tampil</p>
+        <div class="cv"><canvas id="c-gudang"></canvas></div>
+      </section>
+      <section class="panel card">
+        <h3>Nilai selisih per bulan opname</h3>
+        <p class="hint">Merah = barang kurang, hijau = barang lebih (juta rupiah)</p>
+        <div class="cv"><canvas id="c-tren"></canvas></div>
+      </section>
+      <section class="panel card">
+        <h3>Barang masuk per bulan</h3>
+        <p class="hint">Jumlah batch menurut tanggal masuk</p>
+        <div class="cv"><canvas id="c-masuk"></canvas></div>
+      </section>
+      <section class="panel card">
+        <h3>10 selisih terbesar</h3>
+        <p class="hint">Berdasarkan nilai rupiah (juta)</p>
+        <div class="cv tall"><canvas id="c-top"></canvas></div>
+      </section>
+      <section class="panel card">
+        <h3>Perlu ditindaklanjuti</h3>
+        <p class="hint">Batch expired dan kritis, urut dari yang paling dekat expired</p>
+        <ul class="watch" id="watch"></ul>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:16px" aria-label="Tabel data">
+      <div class="tbl-head">
+        <h3>Rincian batch</h3>
+        <div class="tools">
+          <label for="pagesize">Baris per halaman</label>
+          <select id="pagesize"><option>10</option><option selected>15</option><option>25</option><option>50</option></select>
+        </div>
+      </div>
+      <div class="scroll"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <div class="pager"><span id="pinfo"></span><div class="btns"><button id="prev" type="button">Sebelumnya</button><button id="next" type="button">Berikutnya</button></div></div>
+    </section>
+
+    <p class="foot" id="foot"></p>
+  </main>
+</div>
+
+<script>
+/* =========================================================
+   DATA — dibaca dari sheet Stock_Opname (Google Sheets).
+   Kunci objek = nama kolom di baris 1, sehingga data dari
+   Sheet maupun file Excel yang diunggah memakai jalur kode sama.
+   ========================================================= */
+/* Data TIDAK ditanam di sini: diambil dari Google Sheets lewat fungsi getData() di Code.gs */
+
+/* ---------- Konstanta status expired ---------- */
+const STATUS = {
+  Expired: {label:'Expired',              color:'#B42318'},
+  Kritis:  {label:'Kritis ≤ 90 hari',     color:'#D9701F'},
+  Waspada: {label:'Waspada 91–180 hari',  color:'#D1A817'},
+  Aman:    {label:'Aman > 180 hari',      color:'#2F7D5A'}
+};
+const STATUS_KEYS = Object.keys(STATUS);
+const statusOf = d => d < 0 ? 'Expired' : d <= 90 ? 'Kritis' : d <= 180 ? 'Waspada' : 'Aman';
+
+/* ---------- Helper format ---------- */
+const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const nf  = (n, d=0) => Number(n).toLocaleString('id-ID', {maximumFractionDigits:d});
+const rp  = n => { const a = Math.abs(n), s = n < 0 ? '−' : '';
+  if (a >= 1e9) return s + 'Rp ' + nf(a/1e9, 2) + ' M';
+  if (a >= 1e6) return s + 'Rp ' + nf(a/1e6, 1) + ' jt';
+  return s + 'Rp ' + nf(a); };
+const rpFull = n => (n < 0 ? '−' : '') + 'Rp ' + nf(Math.abs(n));
+const jt  = n => Math.round(n/1e5)/10;               // rupiah -> juta (1 desimal)
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dnum = iso => Date.UTC(+iso.slice(0,4), +iso.slice(5,7)-1, +iso.slice(8,10)) / 864e5;
+const fmtDate = iso => iso ? iso.slice(8,10) + '/' + iso.slice(5,7) + '/' + iso.slice(0,4) : '–';
+const monthLabel = ym => BULAN[+ym.slice(5,7)-1] + ' ' + ym.slice(0,4);
+const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/\./g,'').replace(',','.')); return isFinite(n) ? n : 0; };
+
+function toISO(v){
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return new Date(v.getTime() + 12*36e5).toISOString().slice(0,10);
+  if (typeof v === 'number') return new Date(Date.UTC(1899,11,30) + Math.round(v)*864e5).toISOString().slice(0,10); // serial Excel
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : '';
+}
+
+/* ---------- Normalisasi 1 baris data + kolom turunan ---------- */
+function normalize(r, i){
+  const g = (...keys) => { for (const k of keys) if (r[k] !== undefined && r[k] !== '') return r[k]; return ''; };
+  const o = {
+    id: String(g('ID Opname')) || 'OP-' + (i+1),
+    opname: toISO(g('Tanggal Opname')),
+    kode: String(g('Kode Barang')), nama: String(g('Nama Barang')),
+    jenis: String(g('Jenis Barang')) || 'Lainnya', satuan: String(g('Satuan')),
+    batch: String(g('No. Batch')), gudang: String(g('Gudang')) || '–', rak: String(g('Lokasi Rak')),
+    simpan: String(g('Kondisi Penyimpanan')), supplier: String(g('Supplier')),
+    masuk: toISO(g('Tanggal Masuk')), expired: toISO(g('Tanggal Expired')),
+    sistem: num(g('Stok Sistem')), fisik: num(g('Stok Fisik')), harga: num(g('Harga Satuan (Rp)','Harga Satuan')),
+    mutu: String(g('Status Mutu')) || '–', petugas: String(g('Petugas')), ket: String(g('Keterangan'))
+  };
+  o.selisih = Math.round((o.fisik - o.sistem) * 1000) / 1000;
+  o.nilaiFisik = o.fisik * o.harga;
+  o.nilaiSelisih = o.selisih * o.harga;
+  o.sisa = (o.expired && o.opname) ? dnum(o.expired) - dnum(o.opname) : null;
+  o.status = o.sisa === null ? 'Aman' : statusOf(o.sisa);
+  return o;
+}
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let DATA = [], SOURCE = 'Google Sheets';
+const state = {
+  f: freshFilters(),
+  sort: {key:'opname', dir:'desc'},
+  page: 1, size: 15
+};
+function freshFilters(){
+  return {q:'', opFrom:'', opTo:'', exFrom:'', exTo:'', inFrom:'', inTo:'',
+          jenis:new Set(), status:new Set(), gudang:'', mutu:'', selisih:''};
+}
+const $ = id => document.getElementById(id);
+
+/* =========================================================
+   FILTER
+   ========================================================= */
+function filtered(){
+  const f = state.f, q = f.q.trim().toLowerCase();
+  return DATA.filter(d =>
+    (!q || (d.nama + ' ' + d.kode + ' ' + d.batch).toLowerCase().includes(q)) &&
+    (!f.opFrom || d.opname >= f.opFrom) && (!f.opTo || d.opname <= f.opTo) &&
+    (!f.exFrom || (d.expired && d.expired >= f.exFrom)) && (!f.exTo || (d.expired && d.expired <= f.exTo)) &&
+    (!f.inFrom || (d.masuk && d.masuk >= f.inFrom)) && (!f.inTo || (d.masuk && d.masuk <= f.inTo)) &&
+    (!f.jenis.size || f.jenis.has(d.jenis)) &&
+    (!f.status.size || f.status.has(d.status)) &&
+    (!f.gudang || d.gudang === f.gudang) &&
+    (!f.mutu || d.mutu === f.mutu) &&
+    (!f.selisih ||
+      (f.selisih === 'ada' && d.selisih !== 0) || (f.selisih === 'kurang' && d.selisih < 0) ||
+      (f.selisih === 'lebih' && d.selisih > 0) || (f.selisih === 'sesuai' && d.selisih === 0))
+  );
+}
+
+/* ---------- Bangun kontrol filter dari data ---------- */
+const uniq = k => [...new Set(DATA.map(d => d[k]).filter(Boolean))].sort();
+function buildControls(){
+  const jenisOrder = ['Bahan Aktif (API)','Eksipien','Kemasan Primer','Kemasan Sekunder','Obat Jadi'];
+  const ord = x => { const i = jenisOrder.indexOf(x); return i < 0 ? 99 : i; };
+  const jenis = uniq('jenis').sort((a,b) => ord(a) - ord(b));
+  $('chips-jenis').innerHTML = jenis.map(j => `<button type="button" class="chip" data-jenis="${esc(j)}" aria-pressed="false">${esc(j)}</button>`).join('');
+  $('chips-status').innerHTML = STATUS_KEYS.map(k => `<button type="button" class="chip" data-status="${k}" aria-pressed="false">${STATUS[k].label}</button>`).join('');
+  const opt = (arr, all) => `<option value="">${all}</option>` + arr.map(v => `<option>${esc(v)}</option>`).join('');
+  $('f-gudang').innerHTML = opt(uniq('gudang'), 'Semua gudang');
+  $('f-mutu').innerHTML = opt(uniq('mutu'), 'Semua status mutu');
+  const months = [...new Set(DATA.map(d => d.opname.slice(0,7)).filter(Boolean))].sort();
+  $('monthChips').innerHTML = months.map(m => `<button type="button" class="chip" data-month="${m}">${monthLabel(m)}</button>`).join('');
+}
+function syncControls(){
+  const f = state.f;
+  $('f-search').value = f.q;
+  ['opFrom','opTo','exFrom','exTo','inFrom','inTo'].forEach(k => $('f-'+k).value = f[k]);
+  $('f-gudang').value = f.gudang; $('f-mutu').value = f.mutu; $('f-selisih').value = f.selisih;
+  document.querySelectorAll('[data-jenis]').forEach(b => b.setAttribute('aria-pressed', f.jenis.has(b.dataset.jenis)));
+  document.querySelectorAll('[data-status]').forEach(b => b.setAttribute('aria-pressed', f.status.has(b.dataset.status)));
+}
+function toggleSet(set, v){ set.has(v) ? set.delete(v) : set.add(v); }
+
+/* =========================================================
+   RINGKASAN (KPI + jalur status)
+   ========================================================= */
+function renderKpis(rows){
+  const n = rows.length;
+  const skus = new Set(rows.map(r => r.kode)).size;
+  const nilai = rows.reduce((s,r) => s + r.nilaiFisik, 0);
+  const selNet = rows.reduce((s,r) => s + r.nilaiSelisih, 0);
+  const withDiff = rows.filter(r => r.selisih !== 0).length;
+  const akurasi = n ? (n - withDiff) / n * 100 : 0;
+  const exp = rows.filter(r => r.status === 'Expired');
+  const expVal = exp.reduce((s,r) => s + r.nilaiFisik, 0);
+  const kri = rows.filter(r => r.status === 'Kritis').length;
+  $('kpis').innerHTML = [
+    ['Batch terhitung', nf(n), `${nf(skus)} kode barang`, ''],
+    ['Nilai stok fisik', rp(nilai), rpFull(nilai), ''],
+    ['Akurasi stok', n ? nf(akurasi,1) + '%' : '–', `${nf(withDiff)} batch ada selisih`, akurasi >= 95 ? 'pos' : (n ? 'neg' : '')],
+    ['Selisih bersih', rp(selNet), selNet < 0 ? 'Barang kurang dari sistem' : (selNet > 0 ? 'Barang lebih dari sistem' : 'Tidak ada selisih'), selNet < 0 ? 'neg' : (selNet > 0 ? 'pos' : '')],
+    ['Batch expired', nf(exp.length), `${rp(expVal)} · ${nf(kri)} lagi kritis`, exp.length ? 'neg' : '']
+  ].map(([l,v,s,c]) => `<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`).join('');
+}
+
+function renderFefo(rows){
+  const agg = {}; STATUS_KEYS.forEach(k => agg[k] = {n:0, v:0});
+  rows.forEach(r => { agg[r.status].n++; agg[r.status].v += r.nilaiFisik; });
+  const total = STATUS_KEYS.reduce((s,k) => s + agg[k].v, 0) || 1;
+  $('fefo-bar').innerHTML = STATUS_KEYS.filter(k => agg[k].v > 0)
+    .map(k => `<i style="width:${agg[k].v/total*100}%;background:${STATUS[k].color}" title="${STATUS[k].label}: ${nf(agg[k].v/total*100,1)}%"></i>`).join('');
+  $('fefo-legend').innerHTML = STATUS_KEYS.map(k =>
+    `<button type="button" class="fl" data-fefo="${k}" aria-pressed="${state.f.status.has(k)}">
+       <span class="n"><u style="background:${STATUS[k].color}"></u>${STATUS[k].label}</span>
+       <span class="d">${nf(agg[k].n)} batch · ${rp(agg[k].v)} (${nf(agg[k].v/total*100,1)}%)</span></button>`).join('');
+}
+
+/* =========================================================
+   GRAFIK (Chart.js) — dibuat sekali, lalu di-update
+   ========================================================= */
+Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font');
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#5B6E78';
+const charts = {};
+const GRID = {color:'#E6ECEF'};
+const BRAND = '#0B6A6F', RED = '#B42318', GREEN = '#2F7D5A';
+const PALETTE = ['#0B6A6F','#3F9FA3','#E0A030','#7A8FA6','#B8634B','#8E7CC3'];
+
+function makeCharts(){
+  charts.jenis = new Chart($('c-jenis'), {type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:BRAND,borderRadius:3}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c => ' Rp ' + nf(c.raw,1) + ' juta'}}},
+      scales:{x:{grid:GRID,ticks:{callback:v => nf(v)}},y:{grid:{display:false}}}}});
+
+  charts.gudang = new Chart($('c-gudang'), {type:'doughnut',
+    data:{labels:[],datasets:[{data:[],backgroundColor:PALETTE,borderWidth:2,borderColor:'#fff'}]},
+    options:{maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'right',labels:{boxWidth:12}},
+      tooltip:{callbacks:{label:c => ` ${c.label}: ${rp(c.raw*1e6)}`}}}}});
+
+  charts.tren = new Chart($('c-tren'), {type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:3}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c => ' ' + (c.raw<0?'−':'') + 'Rp ' + nf(Math.abs(c.raw),1) + ' juta'}}},
+      scales:{x:{grid:{display:false}},y:{grid:GRID,ticks:{callback:v => nf(v)}}}}});
+
+  charts.masuk = new Chart($('c-masuk'), {type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:'#3F9FA3',borderRadius:3}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c => ' ' + c.raw + ' batch'}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:60,autoSkip:true,maxTicksLimit:14}},y:{grid:GRID,beginAtZero:true,ticks:{precision:0}}}}});
+
+  charts.top = new Chart($('c-top'), {type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:3}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c => ' ' + (c.raw<0?'−':'+') + 'Rp ' + nf(Math.abs(c.raw),2) + ' juta'}}},
+      scales:{x:{grid:GRID},y:{grid:{display:false},ticks:{font:{size:11}}}}}});
+}
+
+function renderCharts(rows){
+  const sum = (arr, fn) => arr.reduce((s,r) => s + fn(r), 0);
+  const group = (keyFn) => { const m = new Map(); rows.forEach(r => { const k = keyFn(r); if (!k) return; (m.get(k) || m.set(k, []).get(k)).push(r); }); return m; };
+
+  // nilai per jenis
+  const gj = [...group(r => r.jenis)].map(([k,v]) => [k, sum(v, r => r.nilaiFisik)]).sort((a,b) => b[1]-a[1]);
+  charts.jenis.data.labels = gj.map(x => x[0]);
+  charts.jenis.data.datasets[0].data = gj.map(x => Math.round(x[1]/1e5)/10);
+  // gudang
+  const gg = [...group(r => r.gudang)].map(([k,v]) => [k, sum(v, r => r.nilaiFisik)]).sort((a,b) => b[1]-a[1]);
+  charts.gudang.data.labels = gg.map(x => x[0]);
+  charts.gudang.data.datasets[0].data = gg.map(x => Math.round(x[1]/1e5)/10);
+  // tren selisih per bulan opname
+  const gt = [...group(r => r.opname.slice(0,7))].sort((a,b) => a[0] < b[0] ? -1 : 1);
+  const tv = gt.map(([k,v]) => jt(sum(v, r => r.nilaiSelisih)));
+  charts.tren.data.labels = gt.map(x => monthLabel(x[0]));
+  charts.tren.data.datasets[0].data = tv;
+  charts.tren.data.datasets[0].backgroundColor = tv.map(v => v < 0 ? RED : GREEN);
+  // barang masuk per bulan
+  const gm = [...group(r => r.masuk.slice(0,7))].sort((a,b) => a[0] < b[0] ? -1 : 1);
+  charts.masuk.data.labels = gm.map(x => monthLabel(x[0]));
+  charts.masuk.data.datasets[0].data = gm.map(x => x[1].length);
+  // top selisih
+  const top = rows.filter(r => r.selisih !== 0).sort((a,b) => Math.abs(b.nilaiSelisih) - Math.abs(a.nilaiSelisih)).slice(0,10);
+  charts.top.data.labels = top.map(r => (r.nama.length > 30 ? r.nama.slice(0,29) + '…' : r.nama) + ' · ' + r.batch);
+  charts.top.data.datasets[0].data = top.map(r => Math.round(r.nilaiSelisih/1e4)/100);
+  charts.top.data.datasets[0].backgroundColor = top.map(r => r.nilaiSelisih < 0 ? RED : GREEN);
+  Object.values(charts).forEach(c => c.update());
+}
+
+function renderWatch(rows){
+  const list = rows.filter(r => r.status === 'Expired' || r.status === 'Kritis')
+    .sort((a,b) => a.sisa - b.sisa).slice(0,8);
+  $('watch').innerHTML = list.length ? list.map(r => `
+    <li><div class="nm" title="${esc(r.nama)}">${esc(r.nama)}</div>
+        <div class="rt"><span class="badge b-${r.status}">${r.sisa < 0 ? 'Lewat ' + (-r.sisa) + ' hari' : r.sisa + ' hari lagi'}</span></div>
+        <div class="mt"><code>${esc(r.batch)}</code> · ${esc(r.rak || r.gudang)} · exp ${fmtDate(r.expired)}</div>
+        <div class="rt">${rp(r.nilaiFisik)}</div></li>`).join('')
+    : '<li class="empty">Tidak ada batch expired atau kritis pada filter ini.</li>';
+}
+
+/* =========================================================
+   TABEL
+   ========================================================= */
+const COLS = [
+  {k:'opname',  t:'Tgl opname', f:r => fmtDate(r.opname)},
+  {k:'kode',    t:'Kode',       f:r => `<code>${esc(r.kode)}</code>`},
+  {k:'nama',    t:'Nama barang',f:r => esc(r.nama), cls:'nm', title:true},
+  {k:'jenis',   t:'Jenis',      f:r => esc(r.jenis)},
+  {k:'batch',   t:'No. batch',  f:r => `<code>${esc(r.batch)}</code>`},
+  {k:'rak',     t:'Lokasi',     f:r => esc(r.gudang.replace('Gudang ','') + ' · ' + r.rak)},
+  {k:'masuk',   t:'Tgl masuk',  f:r => fmtDate(r.masuk)},
+  {k:'expired', t:'Tgl expired',f:r => fmtDate(r.expired)},
+  {k:'sisa',    t:'Sisa hari',  f:r => r.sisa === null ? '–' : nf(r.sisa), cls:'num'},
+  {k:'status',  t:'Status expired', f:r => `<span class="badge b-${r.status}">${STATUS[r.status].label}</span>`},
+  {k:'sistem',  t:'Stok sistem',f:r => nf(r.sistem,2) + ' ' + esc(r.satuan), cls:'num'},
+  {k:'fisik',   t:'Stok fisik', f:r => nf(r.fisik,2) + ' ' + esc(r.satuan), cls:'num'},
+  {k:'selisih', t:'Selisih',    f:r => r.selisih === 0 ? '–' : `<span class="${r.selisih<0?'neg':'pos'}">${r.selisih>0?'+':'−'}${nf(Math.abs(r.selisih),2)}</span>`, cls:'num'},
+  {k:'nilaiSelisih', t:'Nilai selisih', f:r => r.selisih === 0 ? '–' : `<span class="${r.nilaiSelisih<0?'neg':'pos'}">${rpFull(r.nilaiSelisih)}</span>`, cls:'num'},
+  {k:'mutu',    t:'Status mutu',f:r => `<span class="badge b-${esc(r.mutu)}">${esc(r.mutu)}</span>`}
+];
+
+function renderTable(rows){
+  const {key, dir} = state.sort, m = dir === 'asc' ? 1 : -1;
+  const sorted = rows.slice().sort((a,b) => {
+    const x = a[key], y = b[key];
+    if (x === y) return 0;
+    if (x === null || x === '') return 1; if (y === null || y === '') return -1;
+    return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'id')) * m;
+  });
+  const pages = Math.max(1, Math.ceil(sorted.length / state.size));
+  state.page = Math.min(state.page, pages);
+  const start = (state.page - 1) * state.size;
+  const slice = sorted.slice(start, start + state.size);
+
+  $('tbl').tHead.innerHTML = '<tr>' + COLS.map(c =>
+    `<th data-sort="${c.k}" class="${c.cls==='num'?'num':''}" tabindex="0" ${c.k===key ? `aria-sort="${dir==='asc'?'ascending':'descending'}"` : ''}>${c.t}</th>`).join('') + '</tr>';
+  $('tbl').tBodies[0].innerHTML = slice.length
+    ? slice.map(r => '<tr>' + COLS.map(c => `<td class="${c.cls||''}" ${c.title ? `title="${esc(r.nama)}"` : ''}>${c.f(r)}</td>`).join('') + '</tr>').join('')
+    : `<tr><td colspan="${COLS.length}" class="empty">Tidak ada data yang cocok. Longgarkan rentang tanggal atau tekan “Reset semua filter”.</td></tr>`;
+  $('pinfo').textContent = sorted.length ? `Baris ${nf(start+1)}–${nf(start+slice.length)} dari ${nf(sorted.length)} · halaman ${state.page}/${pages}` : '0 baris';
+  $('prev').disabled = state.page <= 1; $('next').disabled = state.page >= pages;
+}
+
+/* =========================================================
+   RENDER UTAMA
+   ========================================================= */
+function render(){
+  const rows = filtered();
+  $('count').innerHTML = `Menampilkan <b>${nf(rows.length)}</b> dari ${nf(DATA.length)} batch`;
+  renderKpis(rows); renderFefo(rows); renderCharts(rows); renderWatch(rows); renderTable(rows);
+  syncControls();
+  window.__rows = rows;
+}
+function renderHeader(){
+  const ds = DATA.map(d => d.opname).filter(Boolean).sort();
+  $('subtitle').textContent = ds.length ? `Opname ${fmtDate(ds[0])} s/d ${fmtDate(ds[ds.length-1])} · Sumber: ${SOURCE}` : `Sumber: ${SOURCE}`;
+  $('foot').textContent = `Sumber data: ${SOURCE}. Status expired dihitung dari tanggal expired dikurangi tanggal opname setiap baris.`;
+}
+function setData(rows, source){
+  DATA = rows.map(normalize).filter(d => d.opname);
+  SOURCE = source; state.f = freshFilters(); state.page = 1;
+  buildControls(); renderHeader(); render();
+}
+
+/* =========================================================
+   EVENT
+   ========================================================= */
+const bind = (id, key, ev='input') => $(id).addEventListener(ev, e => { state.f[key] = e.target.value; state.page = 1; render(); });
+bind('f-search','q'); bind('f-gudang','gudang','change'); bind('f-mutu','mutu','change'); bind('f-selisih','selisih','change');
+['opFrom','opTo','exFrom','exTo','inFrom','inTo'].forEach(k => bind('f-'+k, k, 'change'));
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button, th'); if (!t) return;
+  if (t.dataset.jenis)  { toggleSet(state.f.jenis, t.dataset.jenis);   state.page = 1; render(); }
+  else if (t.dataset.status) { toggleSet(state.f.status, t.dataset.status); state.page = 1; render(); }
+  else if (t.dataset.fefo)   { toggleSet(state.f.status, t.dataset.fefo);   state.page = 1; render(); }
+  else if (t.dataset.month)  {
+    const [y,m] = t.dataset.month.split('-'), last = new Date(Date.UTC(+y, +m, 0)).getUTCDate();
+    state.f.opFrom = `${y}-${m}-01`; state.f.opTo = `${y}-${m}-${String(last).padStart(2,'0')}`; state.page = 1; render();
+  }
+  else if (t.dataset.sort) {
+    const k = t.dataset.sort;
+    state.sort = {key:k, dir: state.sort.key === k && state.sort.dir === 'asc' ? 'desc' : 'asc'}; render();
+  }
+});
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('th[data-sort]')) { e.preventDefault(); e.target.click(); } });
+
+$('btn-reset').addEventListener('click', () => { state.f = freshFilters(); state.page = 1; render(); });
+$('prev').addEventListener('click', () => { state.page--; render(); });
+$('next').addEventListener('click', () => { state.page++; render(); });
+$('pagesize').addEventListener('change', e => { state.size = +e.target.value; state.page = 1; render(); });
+$('btn-filter').addEventListener('click', () => $('side').classList.toggle('open'));
+
+/* ---------- Ekspor CSV (sesuai filter aktif) ---------- */
+$('btn-csv').addEventListener('click', () => {
+  const rows = window.__rows || [];
+  const head = ['ID Opname','Tanggal Opname','Kode Barang','Nama Barang','Jenis Barang','No. Batch','Gudang','Lokasi Rak','Tanggal Masuk','Tanggal Expired','Sisa Hari','Status Expired','Satuan','Stok Sistem','Stok Fisik','Selisih','Harga Satuan (Rp)','Nilai Selisih (Rp)','Status Mutu','Keterangan'];
+  const line = r => [r.id,r.opname,r.kode,r.nama,r.jenis,r.batch,r.gudang,r.rak,r.masuk,r.expired,r.sisa,STATUS[r.status].label,r.satuan,r.sistem,r.fisik,r.selisih,r.harga,r.nilaiSelisih,r.mutu,r.ket]
+    .map(v => '"' + String(v ?? '').replace(/"/g,'""') + '"').join(',');
+  const blob = new Blob(['\ufeff' + [head.map(h => '"'+h+'"').join(','), ...rows.map(line)].join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'stock_opname_filter_' + new Date().toISOString().slice(0,10) + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+});
+
+/* ---------- Muat file Excel / CSV ---------- */
+const REQUIRED = ['Tanggal Opname','Kode Barang','Nama Barang','Jenis Barang','Tanggal Expired','Stok Sistem','Stok Fisik'];
+function notice(msg){ const n = $('notice'); n.textContent = msg || ''; n.style.display = msg ? 'block' : 'none'; }
+$('btn-load').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('Pustaka pembaca Excel belum termuat. Periksa koneksi internet lalu muat ulang halaman.');
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+    const ws = wb.Sheets['Stock_Opname'] || wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    const missing = REQUIRED.filter(h => !rows.length || !(h in rows[0]));
+    if (missing.length) throw new Error('Kolom tidak ditemukan: ' + missing.join(', ') + '. Pakai nama kolom yang sama dengan sheet Stock_Opname.');
+    setData(rows, file.name); notice('');
+  } catch (err) { notice(err.message); }
+  e.target.value = '';
+});
+
+/* ---------- Mulai ---------- */
+makeCharts();
+
+/* ---------- Ambil data dari Google Sheets (Apps Script) ---------- */
+function loadFromSheet(){
+  notice('');
+  $('subtitle').textContent = 'Memuat data dari Google Sheets…';
+  if (typeof google === 'undefined' || !google.script) { setData([], 'tidak terhubung'); notice('Halaman ini harus dibuka lewat URL web app Apps Script.'); return; }
+  google.script.run
+    .withSuccessHandler(rows => {
+      setData(rows, 'Google Sheets');
+      if (!rows.length) notice('Sheet Stock_Opname kosong atau nama kolomnya tidak sesuai.');
+    })
+    .withFailureHandler(err => { setData([], 'gagal dimuat'); notice('Gagal memuat data: ' + (err && err.message ? err.message : err)); })
+    .getData();
+}
+$('btn-refresh').addEventListener('click', loadFromSheet);
+loadFromSheet();
+</script>
+</body>
+</html>
